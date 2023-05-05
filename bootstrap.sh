@@ -47,19 +47,18 @@ dnf install -y unzip
 dnf install -y git
 
 # Change shells
-chsh -s /usr/bin/zsh     # ZSH as interactive shell
-ln -sf /bin/dash /bin/sh # Dash as /bin/sh
+chsh -s /usr/bin/zsh $username # ZSH as interactive shell
+ln -sf /bin/dash /bin/sh       # Dash as /bin/sh
 
 # Get nvim config
 cd ~
 test -d ./.config || mkdir .config
 cd .config
+git clone https://github.com/agryphus/nvim.git
 if $is_me; then
-    git clone git@github.com:agryphus/nvim.git
+    git remote set-url origin git@github.com:agryphus/nvim.git
     git config --local user.email agryphus@gmail.com
     git config --local user.name agryphus
-else
-    git clone https://github.com/agryphus/nvim.git
 fi
 
 # Packer
@@ -67,8 +66,17 @@ git clone --depth 1 https://github.com/wbthomason/packer.nvim\
  	~/.local/share/nvim/site/pack/packer/start/packer.nvim
 nvim --headless -c 'autocmd User PackerComplete quitall' -c 'PackerSync'
 
+# Copy over dotfiles
+cd ~/.config
+git clone http://github.com/agryphus/dotfiles.git
+if $is_me; then
+    git remote set-url origin git@github.com:agryphus/dotfiles.git
+    git config --local user.email agryphus@gmail.com
+    git config --local user.name agryphus
+fi
+
 # Setup zsh
-# ~copy .zshrc lol~
+echo "ZDOTDIR=~/.config/dotfiles" >> /etc/zshenv
 cd ~/.config 
 mkdir zsh && cd zsh 
 mkdir plugins && cd plugins
@@ -76,6 +84,6 @@ git clone https://github.com/zsh-users/zsh-syntax-highlighting.git
 
 # Finish up
 chown -R $username:$username ~
-cd ~
-exec zsh
+echo "Done."
+su $username
 
