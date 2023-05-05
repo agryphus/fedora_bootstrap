@@ -1,4 +1,7 @@
 #!/usr/bin/sh
+# Fedora uses bash out of the box
+# Simply script to setup my Fedora environment the way I like it.
+# Version: 36 (Container Image)
 
 # Create new user
 echo -n "Username: "
@@ -15,6 +18,8 @@ passwd $username
 export HOME=/home/$username
 
 # Packages
+dnf install -y util-linux-user
+dnf install -y dash
 dnf install -y zsh
 dnf install -y ncurses
 dnf install -y ripgrep
@@ -23,6 +28,10 @@ dnf install -y npm
 dnf install -y clang
 dnf install -y unzip
 dnf install -y git
+
+# Change shells
+chsh -s /usr/bin/zsh     # ZSH as interactive shell
+ln -sf /bin/dash /bin/sh # Dash as /bin/sh
 
 # Get nvim config
 cd ~
