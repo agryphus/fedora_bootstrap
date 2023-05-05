@@ -1,4 +1,4 @@
-#!/usr/bin/sh
+#!/usr/bin/bash
 # Fedora uses bash out of the box
 # Simply script to setup my Fedora environment the way I like it.
 # Version: 36 (Container Image)
@@ -16,6 +16,23 @@ passwd $username
 
 # Treat user's home as new home for rest of script
 export HOME=/home/$username
+
+# Copy over my git private key
+echo -n "Git id_rsa location (skip if you aren't me): "
+read -e id_rsa
+id_rsa="${id_rsa/#\~/$HOME}"
+is_me=false
+if [ -f "$id_rsa" ]; then
+    is_me=true
+    cd ~
+    test -d ./.ssh || mkdir .ssh
+    cd ./.ssh
+    cp $id_rsa ./id_rsa
+    chown $username:$username ./id_rsa
+    chmod 600 ./id_rsa
+else
+    is_me=false
+fi
 
 # Packages
 dnf install -y util-linux-user
@@ -37,7 +54,13 @@ ln -sf /bin/dash /bin/sh # Dash as /bin/sh
 cd ~
 test -d ./.config || mkdir .config
 cd .config
-git clone https://github.com/agryphus/nvim.git
+if $is_me; then
+    git clone git@github.com:agryphus/nvim.git
+    git config --local user.email agryphus@gmail.com
+    git config --local user.name agryphus
+else
+    git clone https://github.com/agryphus/nvim.git
+fi
 
 # Packer
 git clone --depth 1 https://github.com/wbthomason/packer.nvim\
