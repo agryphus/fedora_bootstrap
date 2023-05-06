@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 # Fedora uses bash out of the box
-# Simply script to setup my Fedora environment the way I like it.
+# Simple script to setup my Fedora environment the way I like it.
 # Version: 36 (Container Image)
 
 # Create new user
@@ -17,25 +17,24 @@ passwd $username
 # Treat user's home as new home for rest of script
 export HOME=/home/$username
 
-# Copy over my git private key
-echo -n "Git id_rsa location (skip if you aren't me): "
+# Copy over git private key
+echo -n "Git id_rsa location (skip if you don't have one): "
 read -e id_rsa
 id_rsa="${id_rsa/#\~/$HOME}"
-is_me=false
+use_ssh=false
 if [ -f "$id_rsa" ]; then
-    is_me=true
+    use_ssh=true
     cd ~
     test -d ./.ssh || mkdir .ssh
     cd ./.ssh
     cp $id_rsa ./id_rsa
     chown $username:$username ./id_rsa
     chmod 600 ./id_rsa
-else
-    is_me=false
 fi
 
 # Packages
 dnf install -y util-linux-user
+dnf install -y systemd
 dnf install -y dash
 dnf install -y zsh
 dnf install -y ncurses
@@ -54,11 +53,10 @@ ln -sf /bin/dash /bin/sh       # Dash as /bin/sh
 cd ~
 test -d ./.config || mkdir .config
 cd .config
-git clone https://github.com/agryphus/nvim.git
-if $is_me; then
-    git remote set-url origin git@github.com:agryphus/nvim.git
-    git config --local user.email agryphus@gmail.com
-    git config --local user.name agryphus
+if $use_ssh; then
+    git clone git@github.com:agryphus/nvim.git
+else
+    git clone https://github.com/agryphus/nvim.git
 fi
 
 # Packer
@@ -68,11 +66,10 @@ nvim --headless -c 'autocmd User PackerComplete quitall' -c 'PackerSync'
 
 # Copy over dotfiles
 cd ~/.config
-git clone http://github.com/agryphus/dotfiles.git
-if $is_me; then
-    git remote set-url origin git@github.com:agryphus/dotfiles.git
-    git config --local user.email agryphus@gmail.com
-    git config --local user.name agryphus
+if $use_ssh; then
+    git clone git@github.com:agryphus/dotfiles.git
+else
+    git clone https://github.com/agryphus/dotfiles.git
 fi
 
 # Setup zsh
@@ -82,8 +79,18 @@ mkdir zsh && cd zsh
 mkdir plugins && cd plugins
 git clone https://github.com/zsh-users/zsh-syntax-highlighting.git
 
+# Editing WSL configuration
+touch /etc/wsl.conf
+echo "[interop]
+appendWindowsPat h= false
+
+[boot]
+systemd = true
+" >> /etc/wsl.conf
+
 # Finish up
+cd ~
 chown -R $username:$username ~
-echo "Done."
+echo "Finished setup. Some changes will require restarting WSL."
 su $username
 
