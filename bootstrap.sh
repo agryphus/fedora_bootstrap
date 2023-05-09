@@ -57,6 +57,9 @@ dnf install -y clang
 dnf install -y unzip
 dnf install -y git
 
+# Rust
+curl --proto '=https' --tlsv1.2 -sSf http://sh.rustup.rs | sh -s -- -y
+
 # Configure git
 if $set_git; then
     git config --global user.name $git_username
