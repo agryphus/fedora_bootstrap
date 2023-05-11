@@ -45,17 +45,18 @@ if [ -f "$id_rsa" ]; then
 fi
 
 # Packages
-dnf install -y util-linux-user
-dnf install -y systemd
+dnf install -y clang
 dnf install -y dash
-dnf install -y zsh
+dnf install -y dos2unix
+dnf install -y git
 dnf install -y ncurses
-dnf install -y ripgrep
 dnf install -y neovim python3-neovim
 dnf install -y npm
-dnf install -y clang
+dnf install -y ripgrep
+dnf install -y systemd
 dnf install -y unzip
-dnf install -y git
+dnf install -y util-linux-user
+dnf install -y zsh
 
 # Rust
 curl --proto '=https' --tlsv1.2 -sSf http://sh.rustup.rs | sh -s -- -y
