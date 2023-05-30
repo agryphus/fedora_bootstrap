@@ -49,9 +49,11 @@ dnf install -y clang
 dnf install -y dash
 dnf install -y dos2unix
 dnf install -y git
+dnf install -y hostname
 dnf install -y ncurses
 dnf install -y neovim python3-neovim
 dnf install -y npm
+dnf install -y openssh-server
 dnf install -y ripgrep
 dnf install -y systemd
 dnf install -y unzip
