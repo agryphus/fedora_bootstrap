@@ -3,65 +3,81 @@
 # Simple script to setup my Fedora environment the way I like it.
 # Version: 36 (Container Image)
 
-# Download passwd first.
-echo "Installing passwd... Might take a second to update dnf."
+# Make dnf faster
 echo "max_parallel_downloads=10" >> /etc/dnf/dnf.conf
-dnf install -y passwd
+
+# Editing WSL configuration
+touch /etc/wsl.conf
+echo "[interop]
+appendWindowsPath=false
+
+[boot]
+systemd=true
+" >> /etc/wsl.conf
+
+# Packages
+dnf install -y clang dash dos2unix git hostname ncurses neovim python3-neovim npm openssh-server passwd ripgrep systemd unzip util-linux-user zsh
+
+# Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
 # Create new user
 echo -n "Username: "
-read username 
+read username
 echo "Hello, $username"
-useradd $username 
-usermod -aG wheel $username # Grant sudo
+useradd $username -g wheel
 passwd $username
 
 # Treat user's home as new home for rest of script
 export HOME=/home/$username
 
 # Git account info
-echo -n "Git username: "
-read git_username
-echo -n "Git email: "
-read git_email
-set_git=true
-if [ "$git_username" = "" ] || [ "$git_email" = "" ]; then
-    set_git=false
+echo -n "Setup git account? [y/n]: "
+read set_git_prompt
+set_git=false
+if [ "$set_git_prompt" = "y" ]; then
+    set_git=true
+    echo -n "Git username: "
+    read git_username
+    echo -n "Git email: "
+    read git_email
 fi
 
-# Copy over git private key
-echo -n "Git id_rsa location (skip if you don't have one): "
-read -e id_rsa
-id_rsa="${id_rsa/#\~/$HOME}"
+# Copy over rsa private key
+echo -n "Copy over rsa key? [y/n]: "
+read copy_rsa_prompt
+if [ "$copy_rsa_prompt" = "y" ]; then
+    echo -n "id_rsa location: "
+    read -e id_rsa
+    id_rsa="${id_rsa/#\~/$HOME}"
+    if [ -f "$id_rsa" ]; then
+        cd ~
+        test -d ./.ssh || mkdir .ssh
+        cd ./.ssh
+        cp $id_rsa ./id_rsa
+        chown $username:wheel ./id_rsa
+        chmod 600 ./id_rsa
+    fi
+fi
+
+echo -n "Use ssh to download git repos? [y/n]: "
+read use_ssh_prompt
 use_ssh=false
-if [ -f "$id_rsa" ]; then
+if [ "$use_ssh_prompt" = "y" ]; then
     use_ssh=true
-    cd ~
-    test -d ./.ssh || mkdir .ssh
-    cd ./.ssh
-    cp $id_rsa ./id_rsa
-    chown $username:$username ./id_rsa
-    chmod 600 ./id_rsa
+
+    # Adding github to known hosts manually since the prompt
+    # to add it does not want to be skipped with `yes yes`
+    touch ~/.ssh/known_hosts
+    curl --silent https://api.github.com/meta | \
+        python3 -c 'import json,sys;print(*["github.com " + x for x in json.load(sys.stdin)["ssh_keys"]], sep="\n")' \
+        >> ~/.ssh/known_hosts
+
+    # Add rsa key to this session
+    cp -r ~/.ssh/ /root/.ssh/
+    eval `ssh-agent`
+    ssh-add ~/.ssh/id_rsa
 fi
-
-# Packages
-dnf install -y clang
-dnf install -y dash
-dnf install -y dos2unix
-dnf install -y git
-dnf install -y hostname
-dnf install -y ncurses
-dnf install -y neovim python3-neovim
-dnf install -y npm
-dnf install -y openssh-server
-dnf install -y ripgrep
-dnf install -y systemd
-dnf install -y unzip
-dnf install -y util-linux-user
-dnf install -y zsh
-
-# Rust
-curl --proto '=https' --tlsv1.2 -sSf http://sh.rustup.rs | sh -s -- -y
 
 # Configure git
 if $set_git; then
@@ -77,9 +93,10 @@ ln -sf /bin/dash /bin/sh       # Dash as /bin/sh
 cd ~
 test -d ./.config || mkdir .config
 cd .config
-git clone https://github.com/agryphus/nvim.git
 if $use_ssh; then
-    git remote set-url origin git@github.com:agryphus/nvim.git
+    git clone git@github.com:agryphus/nvim.git
+else
+    git clone https://github.com/agryphus/nvim.git
 fi
 
 # Packer
@@ -89,9 +106,10 @@ nvim --headless -c 'autocmd User PackerComplete quitall' -c 'PackerSync'
 
 # Copy over dotfiles
 cd ~/.config
-git clone https://github.com/agryphus/dotfiles.git
 if $use_ssh; then
-    git remote set-url origin git@github.com:agryphus/dotfiles.git
+    git clone git@github.com:agryphus/dotfiles.git
+else
+    git clone https://github.com/agryphus/dotfiles.git
 fi
 
 # Setup zsh
@@ -99,20 +117,16 @@ echo "ZDOTDIR=~/.config/dotfiles" >> /etc/zshenv
 cd ~/.config 
 mkdir zsh && cd zsh 
 mkdir plugins && cd plugins
-git clone https://github.com/zsh-users/zsh-syntax-highlighting.git
-
-# Editing WSL configuration
-touch /etc/wsl.conf
-echo "[interop]
-appendWindowsPath=false
-
-[boot]
-systemd=true
-" >> /etc/wsl.conf
+if $use_ssh; then
+    git clone git@github.com:zsh-users/zsh-syntax-highlighting.git
+else
+    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git
+fi
 
 # Finish up
 cd ~
-chown -R $username:$username ~
+rm -r /root/.ssh/
+chown -R $username:wheel ~
 echo "Finished setup. Some changes will require restarting WSL."
 su $username
 
