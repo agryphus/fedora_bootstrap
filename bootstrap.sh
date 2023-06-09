@@ -16,7 +16,7 @@ systemd=true
 " >> /etc/wsl.conf
 
 # Packages
-dnf install -y clang dash dos2unix git hostname ncurses neovim python3-neovim npm openssh-server passwd ripgrep systemd unzip util-linux-user zsh
+dnf install -y clang dash dos2unix git hostname ncurses neovim npm openssh-server passwd pinentry python3-neovim ripgrep systemd unzip util-linux-user zsh
 
 # Rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -43,22 +43,10 @@ if [ "$set_git_prompt" = "y" ]; then
     read git_email
 fi
 
-# Copy over rsa private key
-echo -n "Copy over rsa key? [y/n]: "
-read copy_rsa_prompt
-if [ "$copy_rsa_prompt" = "y" ]; then
-    echo -n "id_rsa location: "
-    read -e id_rsa
-    id_rsa="${id_rsa/#\~/$HOME}"
-    if [ -f "$id_rsa" ]; then
-        cd ~
-        test -d ./.ssh || mkdir .ssh
-        cd ./.ssh
-        cp $id_rsa ./id_rsa
-        chown $username:wheel ./id_rsa
-        chmod 600 ./id_rsa
-    fi
-fi
+# Enable ssh using gpg
+cd ~
+test -d ./.gnupg || mkdir .gnupg
+echo "enable-ssh-support" >> .gnupg/gpg-agent.conf
 
 echo -n "Use ssh to download git repos? [y/n]: "
 read use_ssh_prompt
@@ -68,15 +56,36 @@ if [ "$use_ssh_prompt" = "y" ]; then
 
     # Adding github to known hosts manually since the prompt
     # to add it does not want to be skipped with `yes yes`
+    test -d ~/.ssh || mkdir ~/.ssh
     touch ~/.ssh/known_hosts
     curl --silent https://api.github.com/meta | \
         python3 -c 'import json,sys;print(*["github.com " + x for x in json.load(sys.stdin)["ssh_keys"]], sep="\n")' \
         >> ~/.ssh/known_hosts
 
-    # Add rsa key to this session
+    # Let root see allowed hosts until session closes
+    # (despite setting $HOME, ssh will still look in /root/ssh/)
     cp -r ~/.ssh/ /root/.ssh/
-    eval `ssh-agent`
-    ssh-add ~/.ssh/id_rsa
+
+    # Enable gpg ssh support
+    echo enable-ssh-support > ~/.gnupg/gpg-agent.conf
+    unset SSH_AGENT_PID
+    if [ "${gnupg_SSH_AUTH_SOCK_by:-0}" -ne $$ ]; then
+        export SSH_AUTH_SOCK="$(gpgconf --list-dirs agent-ssh-socket)"
+    fi
+    export GPG_TTY=$(tty) # Set pinentry tty
+    eval $(gpg-agent --daemon)
+
+    # Copy over gpg keyring
+    echo -n "GPG key location: "
+    read -e gpg_key
+    gpg_key="${gpg_key/#\~/$HOME}" # Make absolute path
+    gpg --import $gpg_key
+
+    # Get the keygrip of the gpg auth sub key
+    keygrip=`gpg --list-keys --with-keygrip | \
+        grep -A1 "sub" | grep "Keygrip" | \
+        awk '{print $NF}'`
+    echo $keygrip > ~/.gnupg/sshcontrol
 fi
 
 # Configure git
@@ -127,6 +136,7 @@ fi
 cd ~
 rm -r /root/.ssh/
 chown -R $username:wheel ~
+chmod 700 ~/.gnupg/
 echo "Finished setup. Some changes will require restarting WSL."
 su $username
 
