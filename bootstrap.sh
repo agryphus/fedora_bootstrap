@@ -3,29 +3,20 @@
 # Simple script to setup my Fedora environment the way I like it.
 # Version: 36 (Container Image)
 
-# Make dnf faster
-echo "max_parallel_downloads=10" >> /etc/dnf/dnf.conf
-
-# Editing WSL configuration
-touch /etc/wsl.conf
-echo "[interop]
-appendWindowsPath=false
-
-[boot]
-systemd=true
-" >> /etc/wsl.conf
-
 # Packages
-dnf install -y clang dash dos2unix git hostname ncurses neovim npm openssh-server passwd pinentry python3-neovim ripgrep systemd unzip util-linux-user zsh
+zypper in -y binutils clang clang-devel dash gcc gcc-c++ git neovim npm python3-neovim ripgrep system-group-wheel tmux zsh
 
-# Rust
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+# Crucify me for changing the sudoers file this way, their
+# fault for there not being more explicit commands to do this.
+sed -i '/^Defaults targetpw/s/^/# /' /etc/sudoers
+sed -i '/^ALL   ALL=(ALL) ALL   #/s/^/# /' /etc/sudoers
+sed -i 's/^#\s*\(%wheel\s*ALL=(ALL:ALL)\s*ALL\)/\1/' /etc/sudoers
 
 # Create new user
 echo -n "Username: "
 read username
 echo "Hello, $username"
-useradd $username -g wheel
+useradd $username -g wheel -m
 passwd $username
 
 # Treat user's home as new home for rest of script
@@ -87,16 +78,17 @@ if [ "$use_ssh_prompt" = "y" ]; then
         awk '{print $NF}'`
     echo $keygrip > ~/.gnupg/sshcontrol
 fi
+chmod 700 ~/.ssh/
+chmod 600 ~/.ssh/*
+chmod 700 ~/.gnupg/
+chmod 600 ~/.gnupg/*
+
 
 # Configure git
 if $set_git; then
     git config --global user.name $git_username
     git config --global user.email $git_email
 fi
-
-# Change shells
-chsh -s /usr/bin/zsh $username # ZSH as interactive shell
-ln -sf /bin/dash /bin/sh       # Dash as /bin/sh
 
 # Get nvim config
 cd ~
@@ -111,7 +103,18 @@ fi
 # Packer
 git clone --depth 1 https://github.com/wbthomason/packer.nvim\
  	~/.local/share/nvim/site/pack/packer/start/packer.nvim
-nvim --headless -c 'autocmd User PackerComplete quitall' -c 'PackerSync'
+
+# Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+# Editing WSL configuration
+touch /etc/wsl.conf
+echo "[interop]
+appendWindowsPath=false
+
+[boot]
+systemd=true
+" >> /etc/wsl.conf
 
 # Copy over dotfiles
 cd ~/.config
@@ -132,11 +135,14 @@ else
     git clone https://github.com/zsh-users/zsh-syntax-highlighting.git
 fi
 
+# Change shells
+chsh -s /usr/bin/zsh $username # ZSH as interactive shell
+ln -sf /bin/dash /bin/sh       # Dash as /bin/sh
+
 # Finish up
 cd ~
 rm -r /root/.ssh/
 chown -R $username:wheel ~
-chmod 700 ~/.gnupg/
 echo "Finished setup. Some changes will require restarting WSL."
 su $username
 
