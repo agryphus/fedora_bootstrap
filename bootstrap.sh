@@ -15,7 +15,7 @@ systemd=true
 " >> /etc/wsl.conf
 
 # Packages
-zypper in -y binutils clang clang-devel dash gcc gcc-c++ git neovim npm python3-neovim ripgrep system-group-wheel tmux zsh
+zypper in -y binutils clang clang-devel dash gcc gcc-c++ git neovim npm pass python3-neovim ripgrep system-group-wheel tmux zsh
 
 # Crucify me for changing the sudoers file this way, their
 # fault for there not being more explicit commands to do this.
