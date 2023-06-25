@@ -91,6 +91,10 @@ if [ "$use_ssh_prompt" = "y" ]; then
     export GPG_TTY=$(tty) # Set pinentry tty
     eval $(gpg-agent --daemon)
 
+    # This was plaguing me for longer than it should have I hate it.
+    echo 'Match host * exec "gpg-connect-agent UPDATESTARTUPTTY /bye"' > ~/.ssh/config
+    service sshd restart
+
     # Copy over gpg keyring
     echo -n "GPG key location: "
     read -e gpg_key
